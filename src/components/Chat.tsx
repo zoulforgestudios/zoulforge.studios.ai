@@ -1,7 +1,13 @@
 // ---------------------- IMPORTS ----------------------
+
+
+
+
+
 import React, { useState, useEffect, useRef } from "react";
 import { Mic, MicOff, Settings } from "lucide-react";
 import { VoiceOrb } from "./VoiceOrb";
+export function Chat() {
 
 // Speech Recognition
 const SpeechRecognition =
