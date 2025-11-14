@@ -405,6 +405,15 @@ export function Chat() {
                 <MicOff className="w-8 h-8" />
               )}
             </button>
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onend = () => {
+            console.log("Speech ended");
+             stopListening(); // your function
+            };
+
 
             {/* Permission Status */}
             {micPermission === 'denied' && (
