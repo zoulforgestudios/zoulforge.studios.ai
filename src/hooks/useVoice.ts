@@ -1,49 +1,61 @@
 import { useState, useRef } from "react";
 
-export function useVoice(onTranscript: (text: string) => void) {
-  const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
+export function useVoice() {
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
+  // START LISTENING
   const startListening = () => {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      alert("Speech recognition not supported in this browser.");
+    if (!("webkitSpeechRecognition" in window)) {
+      alert("Speech recognition not supported");
       return;
     }
 
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
     const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.interimResults = false;
+    recognitionRef.current = recognition;
+
     recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
 
-    recognition.onstart = () => {
-      setIsListening(true);
-    };
+    recognition.onstart = () => setListening(true);
 
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      onTranscript(transcript);
-    };
-
-    recognition.onspeechend = () => {
-      recognition.stop();
+    recognition.onerror = () => {
+      console.log("Recognition error");
+      setListening(false);
     };
 
     recognition.onend = () => {
-      setIsListening(false);
+      console.log("Recognition ended");
+      setListening(false);
     };
 
     recognition.start();
-    recognitionRef.current = recognition;
   };
 
+  // STOP LISTENING
   const stopListening = () => {
     recognitionRef.current?.stop();
-    setIsListening(false);
+    setListening(false);
   };
 
-  return { isListening, startListening, stopListening };
+  // TEXT → SPEAK
+  const speak = (text: string) => {
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 1;
+    utter.pitch = 1;
+    utter.volume = 1;
+    utter.lang = "en-US";
+    speechSynthesis.speak(utter);
+  };
+
+  return {
+    listening,
+    startListening,
+    stopListening,
+    speak,
+  };
 }
