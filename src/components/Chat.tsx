@@ -2,6 +2,37 @@ import { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Settings } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { VoiceOrb } from './VoiceOrb';
+import { useVoice } from "../hooks/useVoice";
+
+export const chat = () => {
+  const { isListening, startListening, stopListening } = useVoice(handleTranscript);
+
+  function handleTranscript(text: string) {
+    console.log("User said:", text);
+    // TODO: Send to AI and speak output
+  }
+
+  return (
+    <div>
+      <button onClick={startListening}>
+        {isListening ? "Listening..." : "Start Voice"}
+      </button>
+
+      {isListening && (
+        <button onClick={stopListening}>Stop</button>
+      )}
+    </div>
+  );
+};
+
+function speak(text: string) {
+  const speech = new SpeechSynthesisUtterance(text);
+  speech.lang = "en-US";
+  speech.pitch = 1;
+  speech.rate = 1;
+  window.speechSynthesis.speak(speech);
+}
+
 
 export function Chat() {
   const { messages, addMessage, aiModes, settings, isListening, setIsListening } = useApp();
@@ -261,6 +292,8 @@ export function Chat() {
         content: response,
         aiMode: primaryAI.name,
       });
+      speak(response);
+
 
       // Speak the response
       speakResponse(response);
