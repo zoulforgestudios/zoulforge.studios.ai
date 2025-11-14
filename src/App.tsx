@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { AppProvider, useApp } from './contexts/AppContext';
 import { useAIModeEffects } from './hooks/useAIModeEffects';
 import { Home } from './components/Home';
-import { Chat } from './components/Chat';
+import Chat from './components/Chat';
 import { AIModes } from './components/AIModes';
 import { Tasks } from './components/Tasks';
 import { Apps } from './components/Apps';
