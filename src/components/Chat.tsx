@@ -1,316 +1,289 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Mic, MicOff, Settings } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { VoiceOrb } from './VoiceOrb';
-import { useVoice } from "../hooks/useVoice";
-
-export const chat = () => {
-  const { isListening, startListening, stopListening } = useVoice(handleTranscript);
-
-  function handleTranscript(text: string) {
-    console.log("User said:", text);
-    // TODO: Send to AI and speak output
-  }
-
-  return (
-    <div>
-      <button onClick={startListening}>
-        {isListening ? "Listening..." : "Start Voice"}
-      </button>
-
-      {isListening && (
-        <button onClick={stopListening}>Stop</button>
-      )}
-    </div>
-  );
-};
-
-function speak(text: string) {
-  const speech = new SpeechSynthesisUtterance(text);
-  speech.lang = "en-US";
-  speech.pitch = 1;
-  speech.rate = 1;
-  window.speechSynthesis.speak(speech);
-}
-
 
 export function Chat() {
   const { messages, addMessage, aiModes, settings, isListening, setIsListening } = useApp();
+
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [micPermission, setMicPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt');
-  
+
   const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isInitializedRef = useRef(false);
+  const continuousModeRef = useRef<boolean>(false);
 
   const activeAIs = aiModes.filter(ai => ai.active);
   const primaryAI = activeAIs[0] || aiModes[0];
 
+  // Scroll on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Load API key from localStorage
+  // Load saved API key
   useEffect(() => {
     const savedKey = localStorage.getItem('openai_api_key');
-    if (savedKey) {
-      setApiKey(savedKey);
-    }
+    if (savedKey) setApiKey(savedKey);
   }, []);
 
   // Initialize speech recognition once
   useEffect(() => {
     if (isInitializedRef.current) return;
-    
     const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-    
     if (!SpeechRecognition) {
-      console.error('Speech recognition not supported in this browser');
+      console.warn('Speech recognition not supported in this browser');
       return;
     }
 
-    isInitializedRef.current = true;
     recognitionRef.current = new SpeechRecognition();
-    recognitionRef.current.continuous = true;
-    recognitionRef.current.interimResults = true;
     recognitionRef.current.lang = 'en-US';
+    recognitionRef.current.continuous = false; // will be toggled when starting
+    recognitionRef.current.interimResults = true;
     recognitionRef.current.maxAlternatives = 1;
 
-    console.log('Speech recognition initialized');
+    isInitializedRef.current = true;
   }, []);
 
-  // Check microphone permission
+  // Permission check
   useEffect(() => {
     const checkPermission = async () => {
       try {
-        const result = await navigator.permissions?.query({ name: 'microphone' as PermissionName });
-        if (result) {
+        // navigator.permissions may not support 'microphone' in all browsers
+        if (navigator.permissions && (navigator.permissions as any).query) {
+          const result = await (navigator.permissions as any).query({ name: 'microphone' });
           setMicPermission(result.state as any);
-          result.onchange = () => {
-            setMicPermission(result.state as any);
-          };
+          result.onchange = () => setMicPermission(result.state as any);
+        } else {
+          setMicPermission('prompt');
         }
-      } catch (error) {
-        console.log('Permission check not supported:', error);
+      } catch (err) {
         setMicPermission('prompt');
       }
     };
-    
     checkPermission();
   }, []);
 
-  // Setup speech recognition
-  useEffect(() => {
-    if (!recognitionRef.current) return;
+  // Core recognition handlers (kept outside to avoid re-registering accidentally)
+  const handleRecognitionStart = useCallback(() => {
+    setIsListening(true);
+    setInterimTranscript('');
+    console.log('Speech recognition started');
+  }, [setIsListening]);
 
-    recognitionRef.current.onstart = () => {
-      console.log('Speech recognition started');
-      setIsListening(true);
-    };
+  const handleRecognitionResult = useCallback((event: any) => {
+    let interim = '';
+    let final = '';
 
-    recognitionRef.current.onresult = (event: any) => {
-      let interim = '';
-      let final = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const r = event.results[i];
+      const t = r[0].transcript;
+      if (r.isFinal) final += t;
+      else interim += t;
+    }
 
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          final += transcript;
-        } else {
-          interim += transcript;
-        }
-      }
+    setInterimTranscript(interim);
 
-      setInterimTranscript(interim);
+    if (final) {
+      const fullTranscript = final.toLowerCase().trim();
+      setTranscript(fullTranscript);
+      setInterimTranscript('');
 
-      if (final) {
-        const fullTranscript = final.toLowerCase().trim();
-        console.log('Final transcript:', fullTranscript);
-        
-        // Check for wake word
+      // If wake-word mode enabled, expect "zoul" in transcript.
+      if (settings.wakeWord) {
         if (fullTranscript.includes('zoul')) {
-          setTranscript(fullTranscript);
-          
-          // Process the command after wake word
-          const commandAfterWakeWord = fullTranscript.split('zoul')[1]?.trim();
-          if (commandAfterWakeWord && commandAfterWakeWord.length > 0) {
-            processVoiceCommand(commandAfterWakeWord);
+          const after = fullTranscript.split('zoul')[1]?.trim() || '';
+          if (after.length > 0) {
+            processVoiceCommand(after);
           } else {
-            // Just acknowledged wake word
+            // Acknowledge wake word
             const ackMsg = "Yes, I'm listening. How can I help you?";
-            addMessage({
-              type: 'ai',
-              content: ackMsg,
-              aiMode: primaryAI.name,
-            });
+            addMessage({ type: 'ai', content: ackMsg, aiMode: primaryAI.name });
             speakResponse(ackMsg);
           }
+        } else {
+          // If wakeWord enabled and phrase doesn't contain 'zoul', ignore final result
+          console.log('Wake word not detected - ignoring final transcript:', fullTranscript);
         }
+      } else {
+        // Manual mode or continuous mode: treat final transcript as command
+        processVoiceCommand(fullTranscript);
       }
-    };
+    }
+  }, [settings.wakeWord, primaryAI.name, addMessage]);
 
-    recognitionRef.current.onerror = (event: any) => {
-      console.error('Speech recognition error:', event.error);
-      if (event.error === 'not-allowed' || event.error === 'permission-denied') {
-        setMicPermission('denied');
-        setIsListening(false);
-      } else if (event.error === 'no-speech') {
-        console.log('No speech detected, continuing...');
-      } else if (event.error === 'aborted') {
-        console.log('Recognition aborted, restarting...');
-      }
-    };
+  const handleRecognitionError = useCallback((event: any) => {
+    console.error('Speech recognition error:', event.error);
+    if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+      setMicPermission('denied');
+      setIsListening(false);
+    }
+    // For no-speech / aborted etc, we let onend or logic handle restart if needed
+  }, [setIsListening]);
 
-    recognitionRef.current.onend = () => {
-      console.log('Speech recognition ended');
-      // Auto-restart if we're supposed to be listening
-      if (isListening && recognitionRef.current) {
-        setTimeout(() => {
-          try {
-            recognitionRef.current?.start();
-            console.log('Restarting recognition...');
-          } catch (e: any) {
-            if (e.message?.includes('already started')) {
-              console.log('Recognition already active');
-            } else {
-              console.error('Recognition restart error:', e);
-              setIsListening(false);
-            }
-          }
-        }, 100);
-      }
-    };
+  const handleRecognitionEnd = useCallback(() => {
+    console.log('Speech recognition ended');
+    // If continuous mode or settings specify continuous listening, restart automatically when isListening is true
+    const continuous = continuousModeRef.current;
+    if (continuous && isListening) {
+      // small backoff to avoid rapid restart loop
+      setTimeout(() => {
+        try {
+          recognitionRef.current?.start();
+          console.log('Recognition restarted (continuous mode)');
+        } catch (e: any) {
+          console.warn('Recognition restart failed:', e);
+          setIsListening(false);
+        }
+      }, 150);
+    } else {
+      setIsListening(false);
+    }
+  }, [isListening, setIsListening]);
+
+  // Register handlers when recognitionRef exists and keep them stable
+  useEffect(() => {
+    if (!recognitionRef.current) return;
+    const rec = recognitionRef.current;
+
+    rec.onstart = handleRecognitionStart;
+    rec.onresult = handleRecognitionResult;
+    rec.onerror = handleRecognitionError;
+    rec.onend = handleRecognitionEnd;
 
     return () => {
-      // Cleanup
+      // Remove handlers to avoid duplicate firing if any
+      try {
+        rec.onstart = null;
+        rec.onresult = null;
+        rec.onerror = null;
+        rec.onend = null;
+      } catch (_) {}
     };
-  }, [isListening, settings, primaryAI]);
+  }, [handleRecognitionStart, handleRecognitionResult, handleRecognitionError, handleRecognitionEnd]);
 
+  // Request microphone access helper
   const requestMicrophonePermission = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Stop the stream immediately as we just needed permission
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach(t => t.stop());
       setMicPermission('granted');
-      // Now start listening
-      setTimeout(() => startListening(), 100);
-    } catch (error) {
-      console.error('Microphone permission denied:', error);
+      // Start after granting
+      startListening();
+    } catch (err) {
+      console.error('Microphone permission denied', err);
       setMicPermission('denied');
-      alert('Microphone access is required for voice commands. Please allow microphone access in your browser settings.');
+      alert('Microphone access is required. Please allow it in your browser.');
     }
   };
 
+  // Start listening
   const startListening = () => {
     if (!recognitionRef.current) {
       console.error('Speech recognition not initialized');
       return;
     }
-
     if (micPermission === 'denied') {
-      alert('Microphone access is denied. Please enable it in your browser settings.');
+      alert('Microphone access denied. Please enable it in browser settings.');
       return;
     }
-
     if (micPermission === 'prompt') {
+      // Ask for permission first
       requestMicrophonePermission();
       return;
     }
 
+    const rec = recognitionRef.current;
+    // Determine continuous behavior from settings
+    const continuous = !!settings.continuousListening;
+    continuousModeRef.current = continuous;
+    rec.continuous = continuous;
+    rec.interimResults = true;
+    rec.lang = 'en-US';
     try {
-      recognitionRef.current.start();
+      rec.start();
+      setIsListening(true);
       console.log('Starting speech recognition...');
-    } catch (error: any) {
-      if (error.message?.includes('already started')) {
+    } catch (e: any) {
+      if (e.message?.includes('already started')) {
         console.log('Recognition already running');
         setIsListening(true);
       } else {
-        console.error('Error starting recognition:', error);
+        console.error('Error starting recognition:', e);
       }
     }
   };
 
+  // Stop listening
   const stopListening = () => {
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
         console.log('Stopping speech recognition...');
-      } catch (error) {
-        console.error('Error stopping recognition:', error);
+      } catch (err) {
+        console.warn('Error stopping recognition', err);
       }
     }
     setIsListening(false);
     setInterimTranscript('');
   };
 
+  // Toggle button
   const toggleListening = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening();
-    }
+    if (isListening) stopListening();
+    else startListening();
   };
 
+  // Speak response with SpeechSynthesis
   const speakResponse = (text: string) => {
+    if (!text) return;
     if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-      window.speechSynthesis.speak(utterance);
+      const ut = new SpeechSynthesisUtterance(text);
+      ut.rate = 1.0;
+      ut.pitch = 1.0;
+      ut.volume = 1.0;
+      window.speechSynthesis.cancel(); // cancel any ongoing TTS to avoid overlaps
+      window.speechSynthesis.speak(ut);
     }
   };
 
+  // Process voice command: send to OpenAI or local fallback
   const processVoiceCommand = async (command: string) => {
+    if (!command || command.trim().length === 0) return;
     setIsProcessing(true);
 
-    // Add user message
-    addMessage({
-      type: 'user',
-      content: command,
-    });
+    addMessage({ type: 'user', content: command });
 
     try {
       let response = '';
-
-      // Check if API key is available for OpenAI
       if (apiKey && apiKey.startsWith('sk-')) {
-        // Call OpenAI API
         response = await callOpenAI(command);
       } else {
-        // Fallback to local responses
         response = getLocalResponse(command);
       }
 
-      // Add AI response
-      addMessage({
-        type: 'ai',
-        content: response,
-        aiMode: primaryAI.name,
-      });
-      speak(response);
-
-
-      // Speak the response
+      addMessage({ type: 'ai', content: response, aiMode: primaryAI.name });
       speakResponse(response);
-    } catch (error) {
-      console.error('Error processing command:', error);
-      const errorMsg = 'I encountered an error processing your request. Please check your API key or try again.';
-      addMessage({
-        type: 'ai',
-        content: errorMsg,
-        aiMode: primaryAI.name,
-      });
-      speakResponse(errorMsg);
+    } catch (err) {
+      console.error('Error processing command:', err);
+      const errMsg = 'I encountered an error processing your request. Please check your API key or try again.';
+      addMessage({ type: 'ai', content: errMsg, aiMode: primaryAI.name });
+      speakResponse(errMsg);
     } finally {
       setIsProcessing(false);
+      // In non-continuous (manual) mode we should stop listening after a response
+      if (!settings.continuousListening) {
+        stopListening();
+      }
     }
   };
 
+  // Call OpenAI
   const callOpenAI = async (prompt: string): Promise<string> => {
     const activeAIContext = activeAIs.map(ai => `${ai.name}: ${ai.description}`).join(', ');
     const systemMessage = `You are Zoul, an advanced AI assistant. Currently active modes: ${activeAIContext}. Respond in a helpful, concise manner.`;
@@ -327,7 +300,7 @@ export function Chat() {
           { role: 'system', content: systemMessage },
           { role: 'user', content: prompt },
         ],
-        max_tokens: 150,
+        max_tokens: 300,
         temperature: 0.7,
       }),
     });
@@ -337,34 +310,43 @@ export function Chat() {
     }
 
     const data = await response.json();
-    return data.choices[0]?.message?.content || 'I apologize, but I could not generate a response.';
+    return data.choices?.[0]?.message?.content?.trim() || 'I could not generate a response.';
   };
 
   const getLocalResponse = (command: string): string => {
     const cmd = command.toLowerCase();
-    const activeAINames = activeAIs.map(ai => ai.name).join(', ');
+    const activeAINames = activeAIs.map(ai => ai.name).join(', ') || 'Zoul';
 
     if (cmd.includes('hello') || cmd.includes('hi')) {
-      return `Hello! I'm ${activeAINames || 'Zoul'}. How can I assist you today?`;
+      return `Hello! I'm ${activeAINames}. How can I assist you today?`;
     } else if (cmd.includes('how are you')) {
       return `I'm functioning perfectly with ${activeAIs.length} AI mode${activeAIs.length !== 1 ? 's' : ''} active. How can I help you?`;
     } else if (cmd.includes('what can you do')) {
-      return `I have ${activeAIs.length} AI modes active: ${activeAINames}. I can help with conversations, tasks, and various operations. Try connecting an OpenAI API key for enhanced capabilities.`;
+      return `I have ${activeAIs.length} AI modes active: ${activeAINames}. I can help with conversations, tasks, and various operations. Try adding an OpenAI API key for advanced capabilities.`;
     } else if (cmd.includes('thank')) {
       return "You're welcome! I'm here whenever you need assistance.";
-    } else {
-      return `I'm processing your request with ${activeAINames}. For more advanced responses, please add your OpenAI API key in the settings.`;
     }
+    return `I'm processing your request with ${activeAINames}. For advanced responses, add your OpenAI API key in settings.`;
   };
 
   const saveApiKey = () => {
     localStorage.setItem('openai_api_key', apiKey);
     setShowApiKeyModal(false);
-    addMessage({
-      type: 'system',
-      content: 'OpenAI API key configured successfully!',
-    });
+    addMessage({ type: 'system', content: 'OpenAI API key configured successfully!' });
   };
+
+  // Clean up recognition on unmount
+  useEffect(() => {
+    return () => {
+      try {
+        recognitionRef.current?.onstart = null;
+        recognitionRef.current?.onresult = null;
+        recognitionRef.current?.onend = null;
+        recognitionRef.current?.onerror = null;
+        recognitionRef.current?.stop?.();
+      } catch (_) {}
+    };
+  }, []);
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg)]">
@@ -438,17 +420,8 @@ export function Chat() {
                 <MicOff className="w-8 h-8" />
               )}
             </button>
-            recognition.continuous = false;
-            recognition.interimResults = false;
-            recognition.maxAlternatives = 1;
 
-            recognition.onend = () = {
-            console.log("Speech ended")}
-            { stopListening() // your function
-            }
-
-
-            {/* Permission Status */}
+            {/* Permission status & prompts */}
             {micPermission === 'denied' && (
               <div className="text-sm text-red-400">
                 Microphone access denied. Please enable in browser settings.
@@ -474,7 +447,7 @@ export function Chat() {
       {messages.length > 0 && (
         <div className="max-h-48 overflow-auto p-4 border-t border-[var(--stroke)] bg-[var(--elevated)]">
           <div className="max-w-2xl mx-auto space-y-2">
-            {messages.slice(-5).map((message) => (
+            {messages.slice(-5).map((message: any) => (
               <div
                 key={message.id}
                 className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
