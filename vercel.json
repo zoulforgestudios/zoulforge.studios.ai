@@ -3,11 +3,11 @@
   "rewrites": [
     {
       "source": "/help",
-      "destination": "https://chatbase.co/{agentId}/help"
+      "destination": "https://chatbase.co/{iQ-Hm5SsVmfUBOETQ0QZd}/help"
     },
     {
       "source": "/help/:path*",
-      "destination": "https://chatbase.co/{agentId}/help/:path*"
+      "destination": "https://chatbase.co/{iQ-Hm5SsVmfUBOETQ0QZd}/help/:path*"
     }
   ]
 }
