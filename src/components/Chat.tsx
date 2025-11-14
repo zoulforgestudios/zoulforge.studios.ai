@@ -409,10 +409,10 @@ export function Chat() {
             recognition.interimResults = false;
             recognition.maxAlternatives = 1;
 
-            recognition.onend = () => {
-            console.log("Speech ended");
-             stopListening(); // your function
-            };
+            recognition.onend = () = {
+            console.log("Speech ended")}
+            { stopListening() // your function
+            }
 
 
             {/* Permission Status */}
