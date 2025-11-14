@@ -1,0 +1,13 @@
+
+{
+  "rewrites": [
+    {
+      "source": "/help",
+      "destination": "https://chatbase.co/{agentId}/help"
+    },
+    {
+      "source": "/help/:path*",
+      "destination": "https://chatbase.co/{agentId}/help/:path*"
+    }
+  ]
+}
