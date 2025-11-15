@@ -33,21 +33,31 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
           return (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-                isActive
-                  ? 'bg-[var(--elevated)] text-[var(--accent)] shadow-[0_0_20px_rgba(138,92,255,0.15)]'
-                  : 'text-[var(--muted)] hover:bg-[var(--elevated)] hover:text-[var(--text)]'
-              }`}
-            >
-              <Icon className="w-5 h-5" />
-              <span>{item.label}</span>
-              {isActive && (
-                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
-              )}
-            </button>
+          <button
+          key={item.id}
+          onClick={() => {
+    if (item.id === "chat") {
+      window.open(
+        "https://elevenlabs.io/convai/agent/agent_9401ka3qb3xvf26tkbkajgd9c117",
+        "_blank"
+      );
+    } else {
+      onNavigate(item.id);
+    }
+  }}
+  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+    isActive
+      ? 'bg-[var(--elevated)] text-[var(--accent)] shadow-[0_0_20px_rgba(138,92,255,0.15)]'
+      : 'text-[var(--muted)] hover:bg-[var(--elevated)] hover:text-[var(--text)]'
+  }`}
+>
+  <Icon className="w-5 h-5" />
+  <span>{item.label}</span>
+  {isActive && (
+    <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
+  )}
+</button>
+
           );
         })}
       </nav>
