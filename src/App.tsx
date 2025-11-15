@@ -22,14 +22,6 @@ function AppContent() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { aiModes } = useApp();
 
-  // Load ElevenLabs ConvAI script ONCE
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://unpkg.com/@elevenlabs/convai-widget-embed";
-    script.async = true;
-    document.body.appendChild(script);
-  }, []);
-
   // Apply AI mode effects
   const activeAIs = aiModes.filter(ai => ai.active);
   useAIModeEffects(activeAIs);
