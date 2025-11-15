@@ -14,6 +14,17 @@ import { ZoulverseStory } from './components/ZoulverseStory';
 import { Sidebar } from './components/Sidebar';
 import { BurgerMenu } from './components/BurgerMenu';
 import { SettingsDrawer } from './components/SettingsDrawer';
+import ElevenLabsAgent from "./components/ElevenLabsAgent";
+
+function App() {
+  return (
+    <AppProvider>
+      <ElevenLabsAgent />   {/* Works the same way Chatbase loads */}
+      <AppContent />
+    </AppProvider>
+  );
+}
+
 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState('home');
