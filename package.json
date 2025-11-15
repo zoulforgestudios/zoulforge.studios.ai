@@ -1,5 +1,5 @@
 {
-      "name": "Futuristic AI App Design",
+      "name": "ZOULFORGE STUDIOS",
       "version": "0.1.0",
       "private": true,
       "dependencies": {
@@ -32,6 +32,7 @@
             "class-variance-authority": "^0.7.1",
             "clsx": "*",
             "cmdk": "^1.1.1",
+            "elevenlabs": "^1.59.0",
             "embla-carousel-react": "^8.6.0",
             "framer": "^2.4.1",
             "input-otp": "^1.4.2",
