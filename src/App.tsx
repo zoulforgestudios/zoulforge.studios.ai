@@ -16,24 +16,13 @@ import { BurgerMenu } from './components/BurgerMenu';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import ElevenLabsAgent from "./components/ElevenLabsAgent";
 
-function App() {
-  return (
-    <AppProvider>
-      <ElevenLabsAgent />   {/* Works the same way Chatbase loads */}
-      <AppContent />
-    </AppProvider>
-  );
-}
-
-
 function AppContent() {
   const [currentPage, setCurrentPage] = useState('home');
   const [isBurgerOpen, setIsBurgerOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { aiModes } = useApp();
 
-  // Apply AI mode effects
-  const activeAIs: typeof aiModes = aiModes.filter(ai => ai.active);
+  const activeAIs = aiModes.filter(ai => ai.active);
   useAIModeEffects(activeAIs);
 
   const renderPage = () => {
@@ -55,10 +44,8 @@ function AppContent() {
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--bg)]">
 
-      {/* 🔥 ConvAI Widget (React-Safe Placement) */}
-      <div style={{ position: "fixed", bottom: "20px", right: "20px", zIndex: 9999 }}>
-        <elevenlabs-convai agent-id="agent_9401ka3qb3xvf26tkbkajgd9c117"></elevenlabs-convai>
-      </div>
+      {/* ElevenLabs AI Agent Widget */}
+      <ElevenLabsAgent />
 
       {/* Desktop Sidebar */}
       <div className="hidden lg:block">
@@ -76,7 +63,7 @@ function AppContent() {
         }}
       />
 
-      {/* Main Content */}
+      {/* Main Page Layout */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 border-b border-[var(--stroke)] bg-[var(--panel)] flex items-center justify-between px-4 md:px-6">
           <div className="flex items-center gap-3">
@@ -88,6 +75,7 @@ function AppContent() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
+
             <h1 className="text-[var(--text)]">
               {currentPage === 'home' && 'ZoulForge'}
               {currentPage === 'chat' && 'AI Chat'}
@@ -107,7 +95,7 @@ function AppContent() {
             className="p-2 hover:bg-[var(--elevated)] rounded-lg transition-colors"
           >
             <svg className="w-6 h-6 text-[var(--text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0..." />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c..." />
             </svg>
           </button>
         </header>
@@ -124,4 +112,12 @@ function AppContent() {
     </div>
   );
 }
-export default function App() { return ( <AppProvider> <AppContent /> </AppProvider> ); }
+
+// ✅ Only ONE default export
+export default function App() {
+  return (
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
+  );
+}
