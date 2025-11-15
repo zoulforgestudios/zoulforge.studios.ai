@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useEffect } from "react";
 import { AppProvider, useApp } from './contexts/AppContext';
 import { useAIModeEffects } from './hooks/useAIModeEffects';
 import { Home } from './components/Home';
@@ -23,7 +22,7 @@ function AppContent() {
   const { aiModes } = useApp();
 
   // Apply AI mode effects
-  const activeAIs = aiModes.filter(ai => ai.active);
+  const activeAIs: typeof aiModes = aiModes.filter(ai => ai.active);
   useAIModeEffects(activeAIs);
 
   const renderPage = () => {
