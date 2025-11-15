@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useEffect } from "react";
 import { AppProvider, useApp } from './contexts/AppContext';
 import { useAIModeEffects } from './hooks/useAIModeEffects';
 import { Home } from './components/Home';
@@ -20,40 +21,43 @@ function AppContent() {
   const [isBurgerOpen, setIsBurgerOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { aiModes } = useApp();
-  
+
+  // Load ElevenLabs ConvAI script ONCE
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/@elevenlabs/convai-widget-embed";
+    script.async = true;
+    document.body.appendChild(script);
+  }, []);
+
   // Apply AI mode effects
   const activeAIs = aiModes.filter(ai => ai.active);
   useAIModeEffects(activeAIs);
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'home':
-        return <Home onNavigate={setCurrentPage} />;
-      case 'chat':
-        return <Chat />;
-      case 'ai-modes':
-        return <AIModes />;
-      case 'tasks':
-        return <Tasks />;
-      case 'apps':
-        return <Apps onNavigate={setCurrentPage} />;
-      case 'updates':
-        return <Updates />;
-      case 'profile':
-        return <Profile />;
-      case 'safety':
-        return <Safety />;
-      case 'map':
-        return <HolographicMap />;
-      case 'story':
-        return <ZoulverseStory />;
-      default:
-        return <Home onNavigate={setCurrentPage} />;
+      case 'home': return <Home onNavigate={setCurrentPage} />;
+      case 'chat': return <Chat />;
+      case 'ai-modes': return <AIModes />;
+      case 'tasks': return <Tasks />;
+      case 'apps': return <Apps onNavigate={setCurrentPage} />;
+      case 'updates': return <Updates />;
+      case 'profile': return <Profile />;
+      case 'safety': return <Safety />;
+      case 'map': return <HolographicMap />;
+      case 'story': return <ZoulverseStory />;
+      default: return <Home onNavigate={setCurrentPage} />;
     }
   };
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--bg)]">
+
+      {/* 🔥 ConvAI Widget (React-Safe Placement) */}
+      <div style={{ position: "fixed", bottom: "20px", right: "20px", zIndex: 9999 }}>
+        <elevenlabs-convai agent-id="agent_9401ka3qb3xvf26tkbkajgd9c117"></elevenlabs-convai>
+      </div>
+
       {/* Desktop Sidebar */}
       <div className="hidden lg:block">
         <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
@@ -72,7 +76,6 @@ function AppContent() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top Header */}
         <header className="h-16 border-b border-[var(--stroke)] bg-[var(--panel)] flex items-center justify-between px-4 md:px-6">
           <div className="flex items-center gap-3">
             <button
@@ -96,24 +99,22 @@ function AppContent() {
               {currentPage === 'story' && 'Zoulverse Story'}
             </h1>
           </div>
+
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="p-2 hover:bg-[var(--elevated)] rounded-lg transition-colors"
           >
             <svg className="w-6 h-6 text-[var(--text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0..." />
             </svg>
           </button>
         </header>
 
-        {/* Page Content */}
         <main className="flex-1 overflow-auto">
           {renderPage()}
         </main>
       </div>
 
-      {/* Settings Drawer */}
       <SettingsDrawer
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -121,11 +122,4 @@ function AppContent() {
     </div>
   );
 }
-
-export default function App() {
-  return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
-  );
-}
+export default function App() { return ( <AppProvider> <AppContent /> </AppProvider> ); }
